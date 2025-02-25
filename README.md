@@ -42,6 +42,32 @@ This project presents a **novel Explainable AI (XAI) framework** integrating **C
 - **Spearman’s Rank Correlation (ρ) and Weighted Spearman’s Rank Correlation (WFMρ)** used to **validate counterfactual results**.
 - Counterfactuals compared with **LIME, SHAP, and Grad-CAM**.
 
+
+## Basic Visuals
+
+##  Bayesian Network Structure
+This figure represents the **learned Bayesian Network (BN)** used for structured interpretability.
+![Bayesian Network](images/BN.png)
+
+##  Training & Validation Loss Over Epochs
+The **CNN model's training and validation performance**:
+![Training & Validation](images/Training_Validation.png)
+
+## Random Image divided into 9 regions
+![Dived_Image](images/Xray_divided.png)
+
+##  LIME Explanation – Feature Importance
+LIME results showing **which image regions influenced the CNN decision**.
+![LIME Explanation](images/LIME.png)
+
+##  SHAP Explanation – Feature Attribution
+SHAP heatmap indicating **the impact of each region on model prediction**.
+![SHAP Explanation](images/SHAP.png)
+
+##  Grad-CAM Heatmap – Model Focus
+Grad-CAM visualization showing **which image regions the CNN focused on**.
+![Grad-CAM Explanation](images/GradCAM.png)
+
 ---
 
 ## 📊 Results & Key Findings
