@@ -55,11 +55,35 @@ This project presents a **novel Explainable AI (XAI) framework** integrating **C
 | **Region 0**  | Low → Medium       | 52.53%       | 68%      | +15.50%       |
 | **Region 4**  | Medium → High      | 52.53%       | 66%      | +13.72%       |
 
-### 🔹 **Key Insights**
-✔ **Region 7 is the most critical region** for CNN decision-making.  
-✔ Changes in specific regions **significantly impact pneumonia probability**.  
-✔ **Bayesian Network effectively models** interdependencies between image regions.  
-✔ **Counterfactuals align with LIME, SHAP, and Grad-CAM**, validating interpretability.  
+## 🔍 Comparison with Other Explainability Techniques
+
+To validate the effectiveness of **PGM-based counterfactual explanations**, we compare the results with **three well-known XAI techniques**:
+- **Grad-CAM** (Gradient-weighted Class Activation Mapping)
+- **LIME** (Local Interpretable Model-agnostic Explanations)
+- **SHAP** (Shapley Additive Explanations)
+
+The evaluation is based on:
+1. **Spearman’s Rank Correlation (ρ):** Measures how well-ranked importance scores align.
+2. **Weighted Spearman’s Rank Correlation (WFMρ):** Adjusts for feature importance weighting.
+3. **p-values:** Statistical significance of correlation results.
+
+### **📊 Quantitative Evaluation**
+| Method         | ρ (Spearman) | p-value (ρ) | WFMρ | p-value (WFMρ) |
+|---------------|-------------|-------------|------|----------------|
+| **LIME**      | 0.133       | 0.733       | 0.8973 | 0.001 |
+| **SHAP**      | 0.300       | 0.4328      | 0.9568 | 0.0001 |
+| **Grad-CAM**  | **0.7667**  | **0.0159**  | **0.9899** | **0.0001** |
+
+### **🔹 Key Insights**
+✔ **Grad-CAM exhibits the highest correlation (ρ = 0.7667) with PGM Counterfactuals**, confirming strong alignment in region importance.  
+✔ **LIME shows weak correlation (ρ = 0.133), with a high p-value (0.733), indicating low statistical significance**.  
+✔ **SHAP performs moderately well (ρ = 0.3), with WFMρ = 0.9568, but lower statistical significance compared to Grad-CAM**.  
+✔ **Weighted correlations (WFMρ) are significantly higher for all methods, highlighting the impact of feature importance weighting**.  
+
+---
+
+## 📜 Final Thoughts
+This comparison confirms that **PGM Counterfactuals provide a structured, probabilistic approach** to CNN explainability, aligning well with existing techniques while offering **causal interpretability**.
 
 ---
 
