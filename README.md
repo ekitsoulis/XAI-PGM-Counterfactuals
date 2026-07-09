@@ -1,80 +1,47 @@
 # XAI-PGM-Counterfactuals
 
-A research-oriented Explainable AI project that combines a Convolutional Neural Network (CNN) with Probabilistic Graphical Models (PGMs) to generate region-level counterfactual explanations for chest X-ray pneumonia classification.
+This repository contains the code from my MSc dissertation work on explainable AI for medical-image classification.
 
-The project is designed to answer a specific interpretability question:
+The starting point is simple: a CNN can classify a chest X-ray as Normal or Pneumonia, but the prediction alone is not enough. I wanted to test whether the internal CNN features could be transformed into a more structured explanation, using probabilistic reasoning instead of only heatmaps.
 
-> Can CNN image features be transformed into structured probabilistic evidence so that counterfactual rules can be extracted and compared with standard XAI techniques?
+The project combines three ideas:
+
+1. CNN feature extraction
+2. Region-based prototype similarity
+3. Bayesian Network counterfactual analysis
+
+The goal is not to claim clinical diagnosis. The goal is to explore whether CNN feature regions can be connected with a probabilistic model so that we can ask counterfactual questions such as:
+
+```text
+What happens to the predicted class probability if a specific image region changes from medium similarity to high similarity?
+```
 
 ---
 
-## Why this project matters
+## Problem I worked on
 
-Deep-learning models can achieve strong classification performance on medical-image tasks, but their predictions are difficult to interpret. This project explores a hybrid approach:
+Deep-learning models can perform well on image-classification tasks, but their reasoning is not directly visible. Standard XAI methods such as Grad-CAM, LIME, and SHAP produce useful visual explanations, but they do not give a structured probabilistic model of how regions relate to each other.
 
-1. Train a CNN for binary chest X-ray classification.
-2. Extract high-level feature maps from the last convolutional layer.
-3. Divide each image into a 3 x 3 grid of spatial regions.
-4. Represent each region using CNN-derived feature vectors.
-5. Build regional prototypes with PCA and K-Means.
-6. Convert region-prototype similarities into Bayesian Network variables.
-7. Generate counterfactual explanations by changing region states and observing the effect on predicted class probability.
-8. Compare the resulting region importance ranking with Grad-CAM, LIME, and SHAP.
+My idea was to use the CNN as the feature extractor and then build a Bayesian Network over region-level feature states.
 
-This makes the project more than a standard image classifier: it investigates how deep visual features can be connected to probabilistic reasoning and explainability.
+In plain terms:
+
+```text
+CNN tells us what it sees.
+The Bayesian Network is used to examine how region-level evidence is probabilistically connected.
+Counterfactuals test how changing one region state affects the final probability.
+```
 
 ---
 
 ## Dataset
 
-- **Dataset:** Chest X-Ray Images (Pneumonia), available on Kaggle.
-- **Task:** Binary classification: Normal vs Pneumonia.
-- **Input format:** Chest X-ray images resized to 150 x 150 pixels.
-- **Interpretability representation:** Each image is divided into 9 spatial regions using a 3 x 3 grid. These are positional regions, not manually annotated medical or anatomical labels.
+- Dataset: Chest X-Ray Images (Pneumonia), Kaggle
+- Task: Binary classification, Normal vs Pneumonia
+- Image size used in the model: 150 x 150
+- Region setup: 3 x 3 image grid
 
----
-
-## Technical stack
-
-- Python
-- TensorFlow / Keras
-- scikit-learn
-- imbalanced-learn
-- pgmpy
-- NumPy / Pandas
-- Matplotlib / Seaborn
-- OpenCV
-- scikit-image
-- SHAP
-- LIME
-- NetworkX
-- Netron
-
----
-
-## Methodology
-
-### 1. CNN classification model
-
-A CNN is trained to classify chest X-ray images as Normal or Pneumonia.
-
-Architecture summary:
-
-- Conv2D + MaxPooling block
-- Conv2D + MaxPooling block
-- Conv2D + MaxPooling block
-- Flatten
-- Dense layer
-- Dropout
-- Sigmoid output layer
-
-The trained CNN acts as the predictive model. The PGM component is used for explanation and counterfactual analysis, not as a replacement classifier.
-
-### 2. Feature extraction
-
-Feature maps are extracted from the last convolutional layer. This layer is used because it contains higher-level visual representations while still preserving spatial information.
-
-Each image is divided into 9 regions:
+Important note: the 9 regions are positional grid regions. They are not manually labelled anatomical lung regions. I made this choice because the method had to remain automatic and not depend on manual medical annotation.
 
 | Region | Position |
 |---|---|
@@ -88,80 +55,99 @@ Each image is divided into 9 regions:
 | region_7 | lower-center |
 | region_8 | lower-right |
 
-### 3. Prototype-based regional representation
+---
 
-For each region:
+## Method
 
-1. CNN features are extracted.
-2. Global average pooling is applied.
-3. PCA reduces dimensionality.
-4. K-Means creates a regional prototype.
-5. Cosine similarity measures how close a new image region is to the learned prototype.
+### 1. Train the CNN
 
-The resulting similarity scores become the basis for the Bayesian Network variables.
+I trained a CNN for the Normal vs Pneumonia classification task.
 
-### 4. Bayesian Network construction
+The architecture is intentionally simple:
 
-A Bayesian Network is learned from discretized region-prototype similarity scores.
+```text
+Input image
+-> Conv2D + MaxPooling
+-> Conv2D + MaxPooling
+-> Conv2D + MaxPooling
+-> Flatten
+-> Dense
+-> Dropout
+-> Sigmoid output
+```
 
-- Region nodes: `region_0` to `region_8`
-- Region states: `low`, `medium`, `high`
+The CNN is the classifier. The Bayesian Network is not used to replace the CNN. It is used later for explanation.
+
+### 2. Extract features from the last convolutional layer
+
+I used the last convolutional layer because it contains more abstract visual patterns than the early layers, while still preserving spatial structure.
+
+This matters because the explanation is region-based. If spatial information is completely lost, the Bayesian Network would have no meaningful regional evidence to model.
+
+### 3. Split every image into 9 regions
+
+Each image is divided into a 3 x 3 grid. For each region, CNN features are extracted and converted into a compact representation.
+
+### 4. Build regional prototypes
+
+For every region:
+
+```text
+CNN features
+-> global average pooling
+-> PCA dimensionality reduction
+-> K-Means prototype
+-> cosine similarity to prototype
+```
+
+The prototype is not a medical concept. It is a learned feature reference point for a specific region.
+
+### 5. Discretize similarity scores
+
+The cosine similarity values are converted into three states:
+
+```text
+low, medium, high
+```
+
+These states become the variables used by the Bayesian Network.
+
+### 6. Learn the Bayesian Network
+
+The Bayesian Network is learned from the region-state data.
+
+- Nodes: region_0 to region_8, plus label
 - Structure learning: Hill Climb Search with K2 Score
-- Parameter learning: Maximum Likelihood Estimation
+- Parameter estimation: Maximum Likelihood Estimation
 
-The Bayesian Network models probabilistic relationships between spatial feature regions and the predicted label distribution.
+The BN is used as a structured probabilistic explanation layer over the CNN-derived regional evidence.
 
-### 5. Counterfactual explanation generation
+### 7. Generate counterfactual explanations
 
-Counterfactuals are generated by changing one region state at a time, for example:
+For each region, I change its state and observe how the predicted class probability changes.
+
+Example:
 
 ```text
 region_7: medium -> high
+original probability: 52.53%
+new probability: 84.00%
+change: +31.34%
 ```
 
-The Bayesian Network is then queried to estimate how the probability of the target class changes under that intervention-like evidence change.
-
-The purpose is to produce rule-style explanations such as:
+This gives a rule-style explanation:
 
 ```text
-If region_7 changes from medium similarity to high similarity, the probability of Pneumonia increases.
+Changing region_7 from medium to high similarity increases the probability of the Pneumonia class in this experiment.
 ```
 
-These are probabilistic counterfactual explanations derived from the learned feature-region structure.
-
 ---
 
-## Visual outputs
+## Results from the experiment
 
-### Bayesian Network structure
+### Counterfactual region changes
 
-![Bayesian Network](images/BN.png)
-
-### Training and validation curves
-
-![Training and Validation](images/Training_Validation.png)
-
-### 3 x 3 image-region representation
-
-![Divided X-ray](images/Xray_divided.png)
-
-### LIME explanation
-
-![LIME Explanation](images/LIME.png)
-
-### SHAP explanation
-
-![SHAP Explanation](images/SHAP.png)
-
-### Grad-CAM explanation
-
-![Grad-CAM Explanation](images/GradCAM.png)
-
----
-
-## Representative counterfactual results
-
-| Changed Region | Change | Original Probability | New Probability | Probability Change |
+| Changed region | Change | Original probability | New probability | Difference |
 |---|---:|---:|---:|---:|
 | region_7 | Medium -> High | 52.53% | 84.00% | +31.34% |
 | region_7 | Medium -> Low | 52.53% | 26.00% | -26.84% |
@@ -169,13 +155,13 @@ These are probabilistic counterfactual explanations derived from the learned fea
 | region_0 | Low -> Medium | 52.53% | 68.00% | +15.50% |
 | region_4 | Medium -> High | 52.53% | 66.00% | +13.72% |
 
-The strongest region-level change in this example occurs in `region_7`, suggesting that lower-center image features had the greatest effect on the model's probabilistic explanation for this run.
+In this run, region_7 had the strongest counterfactual effect. I would not interpret this medically by itself. The safer interpretation is that the lower-center grid region had the strongest influence inside this learned feature-probability structure.
 
 ---
 
-## Comparison with Grad-CAM, LIME, and SHAP
+## Comparison with other XAI methods
 
-The counterfactual region-importance ranking is compared with common XAI methods using Spearman's rank correlation and weighted Spearman-style ranking.
+I compared the region ranking from the Bayesian Network counterfactuals with Grad-CAM, LIME, and SHAP.
 
 | Method | Spearman rho | p-value | Weighted ranking score | p-value |
 |---|---:|---:|---:|---:|
@@ -183,7 +169,37 @@ The counterfactual region-importance ranking is compared with common XAI methods
 | SHAP | 0.300 | 0.4328 | 0.9568 | 0.0001 |
 | Grad-CAM | 0.7667 | 0.0159 | 0.9899 | 0.0001 |
 
-In this experiment, Grad-CAM showed the strongest rank alignment with the PGM-based counterfactual region ranking.
+Grad-CAM aligned most strongly with the PGM-based counterfactual ranking in this experiment.
+
+I treat this as supporting evidence, not final proof. The sample size, discretization method, and grid-based regions all affect the result.
+
+---
+
+## Visual examples
+
+### Bayesian Network
+
+![Bayesian Network](images/BN.png)
+
+### Training and validation curves
+
+![Training and Validation](images/Training_Validation.png)
+
+### 3 x 3 image grid
+
+![Divided X-ray](images/Xray_divided.png)
+
+### LIME
+
+![LIME Explanation](images/LIME.png)
+
+### SHAP
+
+![SHAP Explanation](images/SHAP.png)
+
+### Grad-CAM
+
+![Grad-CAM Explanation](images/GradCAM.png)
 
 ---
 
@@ -208,22 +224,18 @@ In this experiment, Grad-CAM showed the strongest rank alignment with the PGM-ba
 
 ## How to run
 
-### 1. Clone the repository
+Clone the repository:
 
 ```bash
 git clone https://github.com/ekitsoulis/XAI-PGM-Counterfactuals.git
 cd XAI-PGM-Counterfactuals
 ```
 
-### 2. Create a virtual environment
+Create and activate a virtual environment:
 
 ```bash
 python -m venv .venv
-```
 
-Activate it:
-
-```bash
 # Windows
 .venv\Scripts\activate
 
@@ -231,57 +243,46 @@ Activate it:
 source .venv/bin/activate
 ```
 
-### 3. Install dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Download the dataset
+Download the Kaggle Chest X-Ray Images dataset and update the local path in the script:
 
-Download the Chest X-Ray Images (Pneumonia) dataset from Kaggle and update the dataset path inside the Python script.
+```python
+data_dir = "path/to/chest_xray"
+```
 
-The original script uses a local Windows path, so the `data_dir` variable must be adapted before running on another machine.
-
----
-
-## Current limitations
-
-This project is a research prototype, not a production medical system.
-
-Important limitations:
-
-- The spatial regions are based on a 3 x 3 grid, not clinically annotated lung regions.
-- The Bayesian Network captures statistical dependencies from extracted features; it should not be interpreted as clinically validated causality.
-- The project uses a local file-path setup and requires manual dataset-path configuration.
-- The implementation is currently contained mainly in one script exported from a research workflow.
-- The sample size used for the Bayesian Network stage is constrained by memory limits.
+The original code was developed locally on Windows, so the path must be changed before running it elsewhere.
 
 ---
 
-## Future improvements
+## What I would improve next
 
-Planned improvements for a more production-style version:
+This project works as a research prototype, but it is not yet a clean production-style package.
 
-- Refactor the code into modular Python files.
-- Add configuration files for dataset paths and experiment settings.
-- Add reproducible notebooks for each stage of the pipeline.
-- Save model metrics and explanation outputs into a structured `results/` directory.
-- Add unit tests for preprocessing, region splitting, similarity calculation, and counterfactual generation.
-- Add a small demo notebook that runs on a limited sample.
+The most important improvements would be:
+
+1. Split the code into modules instead of one long exported script.
+2. Move dataset paths and experiment settings into a config file.
+3. Add a small demo notebook that runs on a limited sample.
+4. Save all outputs into a structured `results/` folder.
+5. Add tests for image splitting, feature extraction, similarity calculation, and counterfactual generation.
+6. Run the BN stage on a larger sample if memory allows.
 
 ---
 
-## Portfolio relevance
+## Limitations
 
-This project demonstrates:
+The main limitations are important:
 
-- Deep-learning image classification
-- CNN feature extraction
-- Explainable AI methodology
-- Probabilistic graphical modelling
-- Counterfactual reasoning
-- Comparison of XAI techniques
-- Research-to-code implementation
+- The 3 x 3 grid is automatic but crude.
+- The regions are not medically annotated.
+- The Bayesian Network shows learned statistical dependencies, not clinically validated causality.
+- The counterfactuals depend on discretization into low, medium, and high states.
+- The BN stage was limited by available memory.
+- The work should be read as an explainability experiment, not as a medical tool.
 
-It is intended to showcase the ability to connect machine learning, probabilistic reasoning, and interpretability in a technically demanding project.
+This is the central trade-off of the project: I avoided manual medical labels and expert annotation, but the price is that the explanations are spatial and probabilistic rather than anatomical and clinically verified.
