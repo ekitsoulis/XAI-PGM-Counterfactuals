@@ -1,0 +1,17 @@
+numpy>=1.26
+pandas>=2.0
+matplotlib>=3.8
+seaborn>=0.13
+pillow>=10.0
+tensorflow>=2.15
+keras>=3.0
+scikit-learn>=1.4
+imbalanced-learn>=0.12
+networkx>=3.2
+pgmpy>=0.1.25
+opencv-python>=4.9
+scikit-image>=0.22
+shap>=0.44
+lime>=0.2.0.1
+netron>=7.0
+jupyter>=1.0
