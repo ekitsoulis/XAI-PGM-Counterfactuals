@@ -1,115 +1,286 @@
-# 🧠 XAI-PGM-Counterfactuals: Explainable AI with Probabilistic Graphical Models
+# XAI-PGM-Counterfactuals
 
-## 📌 Overview
-This project presents a **novel Explainable AI (XAI) framework** integrating **Convolutional Neural Networks (CNNs)** and **Probabilistic Graphical Models (PGMs)** to provide **counterfactual explanations** for AI-driven medical diagnoses. The methodology focuses on **interpreting CNN predictions** in a **pneumonia classification task** using **chest X-ray images**, enhancing transparency in AI-driven decision-making.
+This repository contains the code from my MSc dissertation work on explainable AI for medical-image classification.
 
-### **🔹 Key Contributions**
-✔ **CNN Feature Extraction:** Identifies **critical regions** in medical images.  
-✔ **Prototype-Based Explainability:** Maps CNN **feature maps** to interpretable regions.  
-✔ **Bayesian Networks:** Models relationships **between image regions**.  
-✔ **Counterfactual Reasoning:** Evaluates **alternative explanations** for AI predictions.  
-✔ **Comparison with LIME, SHAP, and Grad-CAM:** Benchmarks performance with existing XAI techniques.
+The starting point is simple: a CNN can classify a chest X-ray as Normal or Pneumonia, but the prediction alone is not enough. I wanted to test whether the internal CNN features could be transformed into a more structured explanation, using probabilistic reasoning instead of only heatmaps.
+
+The project combines three ideas:
+
+1. CNN feature extraction
+2. Region-based prototype similarity
+3. Bayesian Network counterfactual analysis
+
+The goal is not to claim clinical diagnosis. The goal is to explore whether CNN feature regions can be connected with a probabilistic model so that one can ask counterfactual questions such as:
+
+```text
+What happens to the predicted class probability if a specific image region changes from medium similarity to high similarity?
+```
 
 ---
 
-## 📂 Dataset
-- **Dataset Used:** [Chest X-ray Images (Pneumonia)](https://www.kaggle.com/datasets/paultimothymooney/chest-xray) 📸  
-- **Task:** **Binary classification** (Normal vs. Pneumonia).
-- **Feature Representation:** CNN-extracted features from **segmented lung regions**.
+## The Problem
+
+Deep-learning models can perform well on image-classification tasks, but their reasoning is not directly visible. Standard XAI methods such as Grad-CAM, LIME, and SHAP produce useful visual explanations, but they do not give a structured probabilistic model of how regions relate to each other.
+
+My idea was to use the CNN as the feature extractor and then build a Bayesian Network over region-level feature states.
+
+In plain terms:
+
+```text
+CNN tells us what it sees.
+The Bayesian Network is used to examine how region-level evidence is probabilistically connected.
+Counterfactuals test how changing one region state affects the final probability.
+```
 
 ---
 
-## 🚀 Methodology
-### **1️⃣ CNN Feature Extraction**
-- A **Convolutional Neural Network (CNN)** is trained on chest X-ray images.
-- Extracted **feature maps** from the **last convolutional layer**.
-- Divided images into a **3×3 grid** for **localized interpretability**.
-- **Cosine similarity** is used to compare regions with **prototypes**.
+## The Dataset
 
-### **2️⃣ Prototype-Based Explainability**
-- **K-Means Clustering** applied to extracted features for **regional prototypes**.
-- **Principal Component Analysis (PCA)** used for feature reduction.
-- Similarity between new images and stored prototypes computed using **cosine similarity**.
+- Dataset: Chest X-Ray Images (Pneumonia), Kaggle
+- Task: Binary classification, Normal vs Pneumonia
+- Image size used in the model: 150 x 150
+- Region setup: 3 x 3 image grid
 
-### **3️⃣ Probabilistic Graphical Model (PGM) Construction**
-- **Bayesian Network (BN)** created where **nodes represent image regions**.
-- BN structure **learned using Hill Climb Search + K2 Score**.
-- Conditional Probability Distributions (CPDs) estimated using **Maximum Likelihood Estimation**.
+Important note: the 9 regions are positional grid regions. They are not manually labelled anatomical lung regions. This choice was made because the method had to remain automatic and not depend on manual medical annotation.
 
-### **4️⃣ Counterfactual Generation & Analysis**
-- **Region-wise feature similarities** in the Bayesian Network are **modified**.
-- Evaluated how **changes in individual regions** affect CNN predictions.
-- **Spearman’s Rank Correlation (ρ) and Weighted Spearman’s Rank Correlation (WFMρ)** used to **validate counterfactual results**.
-- Counterfactuals compared with **LIME, SHAP, and Grad-CAM**.
+| Region | Position |
+|---|---|
+| region_0 | upper-left |
+| region_1 | upper-center |
+| region_2 | upper-right |
+| region_3 | middle-left |
+| region_4 | center |
+| region_5 | middle-right |
+| region_6 | lower-left |
+| region_7 | lower-center |
+| region_8 | lower-right |
 
+---
 
-## Basic Visuals
+## Method
 
-##  Bayesian Network Structure
-This figure represents the **learned Bayesian Network (BN)** used for structured interpretability.
+### 1. CNN training
+
+I trained a CNN for the Normal vs Pneumonia classification task.
+
+The architecture is intentionally simple:
+
+```text
+Input image
+-> Conv2D + MaxPooling
+-> Conv2D + MaxPooling
+-> Conv2D + MaxPooling
+-> Flatten
+-> Dense
+-> Dropout
+-> Sigmoid output
+```
+
+The CNN is the classifier. The Bayesian Network is not used to replace the CNN. It is used later for explanation.
+
+### 2. Feature Extraction
+
+I used the last convolutional layer because it contains more abstract visual patterns than the early layers, while still preserving spatial structure.
+
+This matters because the explanation is region-based. If spatial information is completely lost, the Bayesian Network would have no meaningful regional evidence to model.
+
+### 3. Image splitting
+
+Each image is divided into a 3 x 3 grid. For each region, CNN features are extracted and converted into a compact representation.
+
+### 4. Regional Prototypes
+
+For every region:
+
+```text
+CNN features
+-> global average pooling
+-> PCA dimensionality reduction
+-> K-Means prototype
+-> cosine similarity to prototype
+```
+
+The prototype is not a medical concept. It is a learned feature reference point for a specific region.
+
+### 5. Discretization of similarity scores
+
+The cosine similarity values are converted into three states:
+
+```text
+low, medium, high
+```
+
+These states become the variables used by the Bayesian Network.
+
+### 6. Bayesian Network
+
+The Bayesian Network is learned from the region-state data.
+
+- Nodes: region_0 to region_8, plus label
+- Structure learning: Hill Climb Search with K2 Score
+- Parameter estimation: Maximum Likelihood Estimation
+
+The BN is used as a structured probabilistic explanation layer over the CNN-derived regional evidence.
+
+### 7. Counterfactual Explanations
+
+For each region, I change its state and observe how the predicted class probability changes.
+
+Example:
+
+```text
+region_7: medium -> high
+original probability: 52.53%
+new probability: 84.00%
+change: +31.34%
+```
+
+This gives a rule-style explanation:
+
+```text
+Changing region_7 from medium to high similarity increases the probability of the Pneumonia class in this experiment.
+```
+
+---
+
+## Results from the experiment
+
+### Counterfactual region changes
+
+| Changed region | Change | Original probability | New probability | Difference |
+|---|---:|---:|---:|---:|
+| region_7 | Medium -> High | 52.53% | 84.00% | +31.34% |
+| region_7 | Medium -> Low | 52.53% | 26.00% | -26.84% |
+| region_4 | Medium -> Low | 52.53% | 29.00% | -23.16% |
+| region_0 | Low -> Medium | 52.53% | 68.00% | +15.50% |
+| region_4 | Medium -> High | 52.53% | 66.00% | +13.72% |
+
+In this run, region_7 had the strongest counterfactual effect. I would not interpret this medically by itself. The safer interpretation is that the lower-center grid region had the strongest influence inside this learned feature-probability structure.
+
+---
+
+## Comparison with other XAI methods
+
+I compared the region ranking from the Bayesian Network counterfactuals with Grad-CAM, LIME, and SHAP.
+
+| Method | Spearman rho | p-value | Weighted ranking score | p-value |
+|---|---:|---:|---:|---:|
+| LIME | 0.133 | 0.733 | 0.8973 | 0.001 |
+| SHAP | 0.300 | 0.4328 | 0.9568 | 0.0001 |
+| Grad-CAM | 0.7667 | 0.0159 | 0.9899 | 0.0001 |
+
+Grad-CAM aligned most strongly with the PGM-based counterfactual ranking in this experiment.
+
+This was treated as supporting evidence, not final proof. The sample size, discretization method, and grid-based regions all affect the result.
+
+---
+
+## Visual examples
+
+### Bayesian Network
+
 ![Bayesian Network](images/BN.png)
 
-##  Training & Validation Loss Over Epochs
-The **CNN model's training and validation performance**:
-![Training & Validation](images/Training_Validation.png)
+### Training and validation curves
 
-## Random Image divided into 9 regions
-![Dived_Image](images/Xray_divided.png)
+![Training and Validation](images/Training_Validation.png)
 
-##  LIME Explanation – Feature Importance
-LIME results showing **which image regions influenced the CNN decision**.
+### 3 x 3 image grid
+
+![Divided X-ray](images/Xray_divided.png)
+
+### LIME
+
 ![LIME Explanation](images/LIME.png)
 
-##  SHAP Explanation – Feature Attribution
-SHAP heatmap indicating **the impact of each region on model prediction**.
+### SHAP
+
 ![SHAP Explanation](images/SHAP.png)
 
-##  Grad-CAM Heatmap – Model Focus
-Grad-CAM visualization showing **which image regions the CNN focused on**.
+### Grad-CAM
+
 ![Grad-CAM Explanation](images/GradCAM.png)
 
 ---
 
-## 📊 Results & Key Findings
+## Repository structure
 
-### **Counterfactual Explanations for CNN Predictions**
-| Changed Region | Change (From → To) | Original Prob | New Prob | Change in Prob |
-|---------------|--------------------|--------------|----------|---------------|
-| **Region 7**  | Medium → High      | 52.53%       | 84%      | +31.34%       |
-| **Region 7**  | Medium → Low       | 52.53%       | 26%      | -26.84%       |
-| **Region 4**  | Medium → Low       | 52.53%       | 29%      | -23.16%       |
-| **Region 0**  | Low → Medium       | 52.53%       | 68%      | +15.50%       |
-| **Region 4**  | Medium → High      | 52.53%       | 66%      | +13.72%       |
-
-## 🔍 Comparison with Other Explainability Techniques
-
-To validate the effectiveness of **PGM-based counterfactual explanations**, we compare the results with **three well-known XAI techniques**:
-- **Grad-CAM** (Gradient-weighted Class Activation Mapping)
-- **LIME** (Local Interpretable Model-agnostic Explanations)
-- **SHAP** (Shapley Additive Explanations)
-
-The evaluation is based on:
-1. **Spearman’s Rank Correlation (ρ):** Measures how well-ranked importance scores align.
-2. **Weighted Spearman’s Rank Correlation (WFMρ):** Adjusts for feature importance weighting.
-3. **p-values:** Statistical significance of correlation results.
-
-### **📊 Quantitative Evaluation**
-| Method         | ρ (Spearman) | p-value (ρ) | WFMρ | p-value (WFMρ) |
-|---------------|-------------|-------------|------|----------------|
-| **LIME**      | 0.133       | 0.733       | 0.8973 | 0.001 |
-| **SHAP**      | 0.300       | 0.4328      | 0.9568 | 0.0001 |
-| **Grad-CAM**  | **0.7667**  | **0.0159**  | **0.9899** | **0.0001** |
-
-### **🔹 Key Insights**
-✔ **Grad-CAM exhibits the highest correlation (ρ = 0.7667) with PGM Counterfactuals**, confirming strong alignment in region importance.  
-✔ **LIME shows weak correlation (ρ = 0.133), with a high p-value (0.733), indicating low statistical significance**.  
-✔ **SHAP performs moderately well (ρ = 0.3), with WFMρ = 0.9568, but lower statistical significance compared to Grad-CAM**.  
-✔ **Weighted correlations (WFMρ) are significantly higher for all methods, highlighting the impact of feature importance weighting**.  
+```text
+.
+├── Evangelos_Kitsoulis_Dissertation's_Python_Code.py
+├── images/
+│   ├── BN.png
+│   ├── GradCAM.png
+│   ├── LIME.png
+│   ├── SHAP.png
+│   ├── Training_Validation.png
+│   └── Xray_divided.png
+├── README.md
+├── LICENCE
+└── requirements.txt
+```
 
 ---
 
-## 📜 Final Thoughts
-This comparison confirms that **PGM Counterfactuals provide a structured, probabilistic approach** to CNN explainability, aligning well with existing techniques while offering **causal interpretability**.
+## How to run
+
+Clone the repository:
+
+```bash
+git clone https://github.com/ekitsoulis/XAI-PGM-Counterfactuals.git
+cd XAI-PGM-Counterfactuals
+```
+
+Create and activate a virtual environment:
+
+```bash
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+
+# macOS/Linux
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Download the Kaggle Chest X-Ray Images dataset and update the local path in the script:
+
+```python
+data_dir = "path/to/chest_xray"
+```
+
+The original code was developed locally on Windows, so the path must be changed before running it elsewhere.
 
 ---
 
+## Future Improvements
+
+This project works as a research prototype, but it is not yet a clean production-style package.
+
+The most important improvements would be:
+
+1. Split the code into modules instead of one long exported script.
+2. Move dataset paths and experiment settings into a config file.
+3. Add a small demo notebook that runs on a limited sample.
+4. Save all outputs into a structured `results/` folder.
+5. Add tests for image splitting, feature extraction, similarity calculation, and counterfactual generation.
+6. Run the BN stage on a larger sample if memory allows.
+
+---
+
+## Limitations
+
+The main limitations are:
+
+- The 3 x 3 grid is automatic but crude.
+- The regions are not medically annotated.
+- The Bayesian Network shows learned statistical dependencies, not clinically validated causality.
+- The counterfactuals depend on discretization into low, medium, and high states.
+- The BN stage was limited by available memory.
+- The work should be read as an explainability experiment, not as a medical tool.
